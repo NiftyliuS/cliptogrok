@@ -168,24 +168,26 @@ def main(args):
 
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
-            plt.plot(steps, train_acc, label="train")
-            plt.plot(steps, val_acc, label="val")
-            plt.legend()
-            plt.title("Modular Division (training on 50% of data)")
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("Accuracy")
-            plt.xscale("log", base=10)
-            plt.savefig("figures/acc.png", dpi=150)
-            plt.close()
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
-            plt.plot(steps, train_loss, label="train")
-            plt.plot(steps, val_loss, label="val")
-            plt.legend()
-            plt.title("Modular Division (training on 50% of data)")
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("Loss")
-            plt.xscale("log", base=10)
-            plt.savefig("figures/loss.png", dpi=150)
+            ax1.plot(steps, train_loss, label="train")
+            ax1.plot(steps, val_loss, label="val")
+            ax1.legend()
+            ax1.set_title("Loss")
+            ax1.set_xlabel("Optimization Steps")
+            ax1.set_ylabel("Loss")
+            ax1.set_xscale("log", base=10)
+
+            ax2.plot(steps, train_acc, label="train")
+            ax2.plot(steps, val_acc, label="val")
+            ax2.legend()
+            ax2.set_title("Accuracy")
+            ax2.set_xlabel("Optimization Steps")
+            ax2.set_ylabel("Accuracy")
+            ax2.set_xscale("log", base=10)
+
+            plt.tight_layout()
+            plt.show()
             plt.close()
 
 
