@@ -1,6 +1,6 @@
 import math
 from argparse import ArgumentParser
-from itertools import permutations
+from lion_pytorch import Lion
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -110,14 +110,26 @@ def main(args):
     train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
-    # For most experiments we used AdamW optimizer with learning rate 10−3,
-    # weight decay 1, β1 = 0.9, β2 = 0.98
-    optimizer = getattr(torch.optim, args.optimizer)(
-        model.parameters(),
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        betas=(args.beta1, args.beta2),
-    )
+    ### Lion optimizer inclusion ###
+    if args.optimizer == 'Lion':
+        # For most Lion experiments we used optimizer with learning rate 1e-3 to 1e-4,
+        # weight decay 0, β1 = 0.9, β2 = 0.97 - 0.98
+        optimizer = Lion(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+            betas=(args.beta1, args.beta2),
+            decoupled_weight_decay=True
+        )
+    else:
+        # For most experiments we used Adam optimizer with learning rate 10−3,
+        # weight decay 0, β1 = 0.9, β2 = 0.98
+        optimizer = getattr(torch.optim, args.optimizer)(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+            betas=(args.beta1, args.beta2),
+        )
 
     #  linear learning rate warmup over the first 10 updates
     scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -201,5 +213,10 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", type=float, default=0.98)
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--optimizer", default="Adam")
+
+    # Clip to Grok specific arguments
+    parser.add_argument("--max_norm", default=2.0)
+    parser.add_argument("--init_norm", default=2.0)
+
     args = parser.parse_args()
     main(args)
