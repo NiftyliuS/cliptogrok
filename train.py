@@ -1,12 +1,12 @@
 import math
 from argparse import ArgumentParser
 from lion_pytorch import Lion
-
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
+from norms import project_to_sphere, clip_weight_norms
 
 
 class Block(nn.Module):
@@ -86,7 +86,8 @@ def division_mod_p_data(p, eq_token, op_token):
 
 
 def main(args):
-    torch.manual_seed(0)
+    if not args.random_seed:
+        torch.manual_seed(args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -103,6 +104,10 @@ def main(args):
     model = Decoder(
         dim=128, num_layers=2, num_heads=4, num_tokens=args.p + 2, seq_len=5
     ).to(device)
+
+    #### Norm layers to equal magnitude ####
+    project_to_sphere(model, args.init_norm)
+    ########################################
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
@@ -168,6 +173,10 @@ def main(args):
                     optimizer.step()
                     scheduler.step()
 
+                    ## CLip layers to max_norm magnitude ##
+                    clip_weight_norms(model, args.max_norm)
+                    #######################################
+
                 acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
                 total_acc += acc.item() * input.shape[-1]
 
@@ -215,8 +224,10 @@ if __name__ == "__main__":
     parser.add_argument("--optimizer", default="Adam")
 
     # Clip to Grok specific arguments
-    parser.add_argument("--max_norm", default=2.0)
+    parser.add_argument("--random_seed", default=False)
+    parser.add_argument("--seed", default=0)
     parser.add_argument("--init_norm", default=2.0)
+    parser.add_argument("--max_norm", default=2.0)
 
     args = parser.parse_args()
     main(args)
