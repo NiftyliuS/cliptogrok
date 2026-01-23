@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
+
 from norms import project_to_sphere, clip_weight_norms
 
 
@@ -106,7 +107,8 @@ def main(args):
     ).to(device)
 
     #### Norm layers to equal magnitude ####
-    project_to_sphere(model, args.init_norm)
+    if args.init_norm > 0:
+        project_to_sphere(model, args.init_norm)
     ########################################
 
     # "We train on the binary operation of division mod 97 with 50% of the data
@@ -174,7 +176,8 @@ def main(args):
                     scheduler.step()
 
                     ## CLip layers to max_norm magnitude ##
-                    clip_weight_norms(model, args.max_norm)
+                    if args.max_norm > 0:
+                        clip_weight_norms(model, args.max_norm)
                     #######################################
 
                 acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
@@ -190,6 +193,17 @@ def main(args):
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+            fig.suptitle(", ".join([
+                f"optim: {args.optimizer}",
+                f"lr: {args.lr:.0e}",
+                f"init_norm: {args.init_norm or 'None'}",
+                f"max_norm: {args.max_norm or 'None'}",
+            ]))
+            fig.text(0.5, 0.89, ", ".join([
+                f"β1: {args.beta1:.2f}",
+                f"β2: {args.beta2:.2f}",
+                f"seed: {torch.initial_seed()}"
+            ]), ha='center', fontsize=10)
 
             ax1.plot(steps, train_loss, label="train")
             ax1.plot(steps, val_loss, label="val")
@@ -226,10 +240,10 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", type=float, default=0.98)
 
     # Clip to Grok specific arguments
-    parser.add_argument("--random_seed", default=False)
-    parser.add_argument("--seed", default=0)
-    parser.add_argument("--init_norm", default=2.0)
-    parser.add_argument("--max_norm", default=2.0)
+    parser.add_argument("--random_seed", type=bool, default=True)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--init_norm", type=float, default=2.0)  # 0 = disable
+    parser.add_argument("--max_norm", type=float, default=2.0)  # 0 = disable
 
     args = parser.parse_args()
     main(args)
