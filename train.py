@@ -113,10 +113,18 @@ def main(args):
         project_to_sphere(model, args.init_norm)
     ########################################
 
-    # "We train on the binary operation of division mod 97 with 50% of the data
+    # "We train on the binary operation of division mod 'args.p' with 'args.train_ratio' of the data
     # in the training set."
     data = division_mod_p_data(args.p, eq_token, op_token)
-    train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
+
+    # train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2) # original code
+
+    ##### Configurable train to validation data ratio #####
+    train_size = int(data.shape[1] * args.train_ratio)
+    perm = torch.randperm(data.shape[1])
+    train_idx, valid_idx = perm[:train_size], perm[train_size:]
+    #######################################################
+
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
     ### Lion optimizer inclusion ###
@@ -234,6 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("--budget", type=int, default=3e5)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0)
+    parser.add_argument("--train_ratio", type=float, default=0.5)
 
     # Optimizer controls
     parser.add_argument("--optimizer", default="Adam")
