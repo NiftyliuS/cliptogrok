@@ -87,7 +87,9 @@ def division_mod_p_data(p, eq_token, op_token):
 
 
 def main(args):
-    if not args.random_seed:
+    if args.random_seed:
+        args.seed = torch.seed()
+    else:
         torch.manual_seed(args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
