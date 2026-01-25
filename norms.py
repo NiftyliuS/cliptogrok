@@ -31,7 +31,7 @@ def project_to_sphere(model, max_norm=2.0):
     """
     for name, param in model.named_parameters():
         norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
-        param.data.mul_(max_norm / norm)
+        param.mul_(max_norm / norm)
 
 
 def clip_weight_norms(model, max_norm=2.0, skip_patterns=['token_embeddings', 'head']):
@@ -44,4 +44,4 @@ def clip_weight_norms(model, max_norm=2.0, skip_patterns=['token_embeddings', 'h
             continue
         norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
         scale = torch.clamp(norm, max=max_norm) / norm
-        param.data.mul_(scale)
+        param.mul_(scale)
