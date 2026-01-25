@@ -110,7 +110,8 @@ def main(args):
 
     #### Norm layers to equal magnitude ####
     if args.init_norm > 0:
-        project_to_sphere(model, args.init_norm)
+        with torch.no_grad():
+            project_to_sphere(model, args.init_norm)
     ########################################
 
     # "We train on the binary operation of division mod 'args.p' with 'args.train_ratio' of the data
@@ -187,7 +188,8 @@ def main(args):
 
                     ## CLip layers to max_norm magnitude ##
                     if args.max_norm > 0:
-                        clip_weight_norms(model, args.max_norm)
+                        with torch.no_grad():
+                            clip_weight_norms(model, args.max_norm)
                     #######################################
 
                 acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
