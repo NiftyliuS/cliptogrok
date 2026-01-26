@@ -247,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_ratio", type=float, default=0.5)
 
     # Optimizer controls
-    parser.add_argument("--optimizer", default="Adam")
+    parser.add_argument("--optimizer", default="Lion")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.97)

@@ -1,4 +1,5 @@
-matplotlib
-torch
-tqdm
-lion-pytorch
+torch==2.9.1+cu126
+torchvision==0.24.1+cu126
+lion-pytorch==0.2.3
+tqdm==4.67.1
+matplotlib==3.10.8
