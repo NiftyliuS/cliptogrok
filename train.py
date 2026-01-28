@@ -128,6 +128,7 @@ def main(args):
     #######################################################
 
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
+    
     ### SignSDG optimizer inclusion ###
     if args.optimizer == 'SignSGD':
         # We don't use betas so we 'nan' them to not be confusing
