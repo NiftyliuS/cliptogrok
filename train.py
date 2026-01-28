@@ -8,6 +8,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from norms import project_to_sphere, clip_weight_norms
+from SignSDG import SignSGD
 
 
 class Block(nn.Module):
@@ -127,9 +128,16 @@ def main(args):
     #######################################################
 
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
-
+    ### SignSDG optimizer inclusion ###
+    if args.optimizer == 'SignSGD':
+        # We don't use betas so we 'nan' them to not be confusing
+        args.beta2 = args.beta1 = float('nan')
+        optimizer = SignSGD(
+            model.parameters(),
+            lr=args.lr
+        )
     ### Lion optimizer inclusion ###
-    if args.optimizer == 'Lion':
+    elif args.optimizer == 'Lion':
         # For most Lion experiments we used optimizer with learning rate 1e-3 to 1e-4,
         # weight decay 0, β1 = 0.9, β2 = 0.97 - 0.98
         optimizer = Lion(
