@@ -71,7 +71,7 @@ class Decoder(nn.Module):
 
 def multiplication_mod_p_data(p, eq_token, op_token):
     """
-    x◦y = x/y (mod p) for 0 ≤ x < p, 0 < y < p
+    x◦y = x*y (mod p) for 0 ≤ x < p, 0 < y < p
     """
     x = torch.arange(p)
     y = torch.arange(1, p)
