@@ -69,7 +69,7 @@ class Decoder(nn.Module):
         return logits
 
 
-def division_mod_p_data(p, eq_token, op_token):
+def multiplication_mod_p_data(p, eq_token, op_token):
     """
     x◦y = x/y (mod p) for 0 ≤ x < p, 0 < y < p
     """
@@ -117,7 +117,7 @@ def main(args):
 
     # "We train on the binary operation of division mod 'args.p' with 'args.train_ratio' of the data
     # in the training set."
-    data = division_mod_p_data(args.p, eq_token, op_token)
+    data = multiplication_mod_p_data(args.p, eq_token, op_token)
 
     # train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2) # original code
 
