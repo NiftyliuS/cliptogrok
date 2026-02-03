@@ -115,7 +115,7 @@ def main(args):
             project_to_sphere(model, args.init_norm)
     ########################################
 
-    # "We train on the binary operation of division mod 'args.p' with 'args.train_ratio' of the data
+    # "We train on the binary operation of multiplication mod 'args.p' with 'args.train_ratio' of the data
     # in the training set."
     data = multiplication_mod_p_data(args.p, eq_token, op_token)
 
