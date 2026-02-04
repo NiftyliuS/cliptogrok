@@ -106,7 +106,7 @@ def main(args):
     # the answer part of the equation. For all experiments we used a
     # transformer with 2 layers, width 128, and 4 attention heads"
     model = Decoder(
-        dim=128, num_layers=2, num_heads=4, num_tokens=args.p + 2, seq_len=5
+        dim=args.dim, num_layers=args.num_layers, num_heads=args.num_heads, num_tokens=args.p + 2, seq_len=5
     ).to(device)
 
     #### Norm layers to equal magnitude ####
@@ -128,7 +128,7 @@ def main(args):
     #######################################################
 
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
-    
+
     ### SignSDG optimizer inclusion ###
     if args.optimizer == 'SignSGD':
         # We don't use betas so we 'nan' them to not be confusing
@@ -255,6 +255,11 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
 
+    # Model configuration
+    parser.add_argument("--dim", type=int, default=128)
+    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--num_heads", type=int, default=4)
+
     # Optimizer controls
     parser.add_argument("--optimizer", default="Lion")
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -269,27 +274,3 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
-
-# Default setup - no norm no clip ~35k steps to 95% val
-# if __name__ == "__main__":
-#     parser = ArgumentParser()
-#     parser.add_argument("--p", type=int, default=97)
-#     parser.add_argument("--budget", type=int, default=3e5)
-#     parser.add_argument("--batch_size", type=int, default=512)
-#     parser.add_argument("--weight_decay", type=float, default=1)
-#     parser.add_argument("--train_ratio", type=float, default=0.5)
-#
-#     # Optimizer controls
-#     parser.add_argument("--optimizer", default="AdamW")
-#     parser.add_argument("--lr", type=float, default=1e-3)
-#     parser.add_argument("--beta1", type=float, default=0.9)
-#     parser.add_argument("--beta2", type=float, default=0.98)
-#
-#     # Clip to Grok specific arguments
-#     parser.add_argument("--random_seed", type=bool, default=False)
-#     parser.add_argument("--seed", type=int, default=0)
-#     parser.add_argument("--init_norm", type=float, default=0.0)  # 0 = disable
-#     parser.add_argument("--max_norm", type=float, default=0.0)  # 0 = disable
-#
-#     args = parser.parse_args()
-#     main(args)
