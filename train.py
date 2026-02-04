@@ -109,6 +109,9 @@ def main(args):
         dim=args.dim, num_layers=args.num_layers, num_heads=args.num_heads, num_tokens=args.p + 2, seq_len=5
     ).to(device)
 
+    #### Counting model parameters ####
+    model_num_params = sum(p.numel() for p in model.parameters())
+
     #### Norm layers to equal magnitude ####
     if args.init_norm > 0:
         with torch.no_grad():
@@ -223,7 +226,8 @@ def main(args):
             fig.text(0.5, 0.89, ", ".join([
                 f"β1: {args.beta1:.2f}",
                 f"β2: {args.beta2:.2f}",
-                f"seed: {torch.initial_seed()}"
+                f"params: {model_num_params:,}",
+                f"seed: {torch.initial_seed()}",
             ]), ha='center', fontsize=10)
 
             ax1.plot(steps, train_loss, label="train")
