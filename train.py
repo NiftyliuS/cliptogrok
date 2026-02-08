@@ -121,7 +121,6 @@ def main(args):
                 'edge_ln': ['token_embeddings', 'ln_f', 'head'],  # first + last + final LayerNorm
             }[args.init_pattern]
             project_to_sphere(model, args.init_norm, patterns)
-
     ########################################
 
     # "We train on the binary operation of multiplication mod 'args.p' with 'args.train_ratio' of the data
