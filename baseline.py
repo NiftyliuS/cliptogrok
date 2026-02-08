@@ -22,9 +22,12 @@ if __name__ == "__main__":
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.98)
 
-    # Clip to Grok specific arguments
+    # Seed options
     parser.add_argument("--random_seed", type=bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
+
+    # Clip controls
+    parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge", "edge_ln"])
     parser.add_argument("--init_norm", type=float, default=0.0)  # 0 = disable
     parser.add_argument("--max_norm", type=float, default=0.0)  # 0 = disable
 
