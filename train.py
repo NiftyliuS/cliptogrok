@@ -225,7 +225,7 @@ def main(args):
             fig.suptitle(", ".join([
                 f"optim: {args.optimizer}",
                 f"lr: {args.lr:.0e}",
-                f"init_pattern: {args.init_pattern or 'None'}",
+                f"init_pattern: {args.init_pattern if args.init_norm else 'None'}",
                 f"init_norm: {args.init_norm or 'None'}",
                 f"max_norm: {args.max_norm or 'None'}",
             ]))
