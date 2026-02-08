@@ -25,6 +25,11 @@ import torch
 
 
 def project_to_sphere(model, max_norm=2.0, norm_patterns=['token_embeddings', 'ln_f', 'head']):
+    """
+    Project weight rows onto L2 sphere of radius max_norm.
+    All rows get exactly max_norm magnitude — not clipped, normalized.
+    Patterns: ['*'] = all params, or list of name substrings to match.
+    """
     for name, param in model.named_parameters():
         if '*' in norm_patterns or any(p in name for p in norm_patterns):
             norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
