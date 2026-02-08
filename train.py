@@ -115,7 +115,13 @@ def main(args):
     #### Norm layers to equal magnitude ####
     if args.init_norm > 0:
         with torch.no_grad():
-            project_to_sphere(model, args.init_norm)
+            patterns = {
+                'all': ['*'],  # all layers
+                'edge': ['token_embeddings', 'head'],  # first + last
+                'edge_ln': ['token_embeddings', 'ln_f', 'head'],  # first + last + final LayerNorm
+            }[args.init_pattern]
+            project_to_sphere(model, args.init_norm, patterns)
+
     ########################################
 
     # "We train on the binary operation of multiplication mod 'args.p' with 'args.train_ratio' of the data
@@ -270,9 +276,12 @@ if __name__ == "__main__":
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.97)
 
-    # Clip to Grok specific arguments
+    # Seed options
     parser.add_argument("--random_seed", type=bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
+
+    # Clip controls
+    parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge", "edge_ln"])
     parser.add_argument("--init_norm", type=float, default=2.0)  # 0 = disable
     parser.add_argument("--max_norm", type=float, default=2.0)  # 0 = disable
 

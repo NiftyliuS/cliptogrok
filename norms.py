@@ -24,14 +24,11 @@ GitHub: https://github.com/NiftyliuS/cliptogrok
 import torch
 
 
-def project_to_sphere(model, max_norm=2.0):
-    """
-    Normalize all weight rows to exactly max_norm (L2).
-    Call once before training to align all layers to uniform scale.
-    """
+def project_to_sphere(model, max_norm=2.0, norm_patterns=['token_embeddings', 'ln_f', 'head']):
     for name, param in model.named_parameters():
-        norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
-        param.mul_(max_norm / norm)
+        if '*' in norm_patterns or any(p in name for p in norm_patterns):
+            norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+            param.mul_(max_norm / norm)
 
 
 def clip_weight_norms(model, max_norm=2.0, skip_patterns=['token_embeddings', 'head']):
