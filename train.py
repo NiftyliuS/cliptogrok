@@ -111,7 +111,7 @@ def main(args):
 
     #### Counting model parameters ####
     model_num_params = sum(p.numel() for p in model.parameters())
-
+    print(f"Model total parameters: {model_num_params}")
     #### Norm layers to equal magnitude ####
     if args.init_norm > 0:
         with torch.no_grad():
