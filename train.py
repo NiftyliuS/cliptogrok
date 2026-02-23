@@ -123,6 +123,12 @@ def main(args):
             project_to_sphere(model, args.init_norm, patterns)
     ########################################
 
+    ## CLip layers to max_norm magnitude ##
+    if args.max_norm > 0:
+        with torch.no_grad():
+            clip_weight_norms(model, args.max_norm)
+    #######################################
+
     # "We train on the binary operation of multiplication mod 'args.p' with 'args.train_ratio' of the data
     # in the training set."
     data = multiplication_mod_p_data(args.p, eq_token, op_token)
@@ -277,7 +283,7 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", type=float, default=0.97)
 
     # Seed options
-    parser.add_argument("--random_seed", type=bool, default=False)
+    parser.add_argument("--random_seed", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
 
     # Clip controls
