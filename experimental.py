@@ -106,3 +106,33 @@ class AdaptiveEMASignSGDV2(torch.optim.Optimizer):
                 lr_scale = min_ratio + (1.0 - min_ratio) * max(0.0, 2.0 * (agreement - 0.5))
 
                 p.data.add_(ema.sign(), alpha=-group['lr'] * lr_scale)
+
+class SignSGDBuffer(torch.optim.Optimizer):
+    def __init__(self, params, lr=1e-3, beta=0.9, eps=1e-8):
+        super().__init__(params, dict(lr=lr, beta=beta, eps=eps))
+
+    @torch.no_grad()
+    def step(self):
+        for group in self.param_groups:
+            eps = group['eps']
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+
+                state = self.state[p]
+                if len(state) == 0:
+                    state['ema'] = torch.zeros_like(p)
+
+                g = p.grad
+                ema = state['ema']
+
+                # Scale gradient to [-1, 1]
+                scaled_g = g / g.abs().max().clamp(min=eps)
+
+                # Blend
+                ema.mul_(group['beta']).add_(scaled_g, alpha=1 - group['beta'])
+
+                # Scale output to [-1, 1]
+                scaled = ema / ema.abs().max().clamp(min=eps)
+
+                p.data.add_(scaled, alpha=-group['lr'])
