@@ -1,2 +1,266 @@
-# cliptogrok
-Clip to Grok: Weight Norm Clipping for Accelerated Generalization
+# Clip to Grok
+
+Per-row weight norm clipping for accelerated generalization. Eliminates grokking delay without weight decay, gradient filtering, or optimizer-specific tuning.
+
+**Paper:** [Clip to Grok: Weight Norm Clipping for Accelerated Generalization](https://arxiv.org/abs/XXXX.XXXXX) (February 2026)
+
+---
+
+![Single-seed demonstration: train and val converge together within ~1000 steps](assets/BASELINE_LION_2L_128D_1E3_2_2_97_M_SEED_0_55.png)
+*Lion+Clip on 2-layer model — no grokking delay. Train and val converge together within ~1000 steps.*
+
+---
+
+## Results
+
+| Architecture | Optimizer | Median Steps | Speedup vs. Baseline |
+|---|---|---|---|
+| 2-layer, 422k params | Lion+Clip | 550 | **66×** |
+| 2-layer, 422k params | Adam+Clip | 1,200 | ~29× |
+| 2-layer, 422k params | SignSGD+Clip | 1,140 | ~31× |
+| 8-layer, 1.6M params | Lion+Clip | 1,570 | **18×** |
+| 8-layer, 1.6M params | Adam+Clip | 2,690 | ~11× |
+| 8-layer, 1.6M params | SignSGD+Clip | 2,910 | ~10× |
+| 8-layer, 1.6M params | AdamW baseline | 28,905 | — |
+
+Zero failures across all 300 edge-init runs on 8-layer models. IQR reduced by 61–72%.
+
+### Baseline vs. Grokfast vs. Clip
+
+![Comparison of baseline, Grokfast, and Lion+Clip on 2-layer modular multiplication](assets/figure1_comparison.png)
+*Baseline reaches 95% val at step 35,040. Grokfast at 780. Lion+Clip at 530 — 66× speedup.*
+
+### Seed stability (2-layer)
+
+![Multi-seed accuracy on 2-layer architecture, n=200 per optimizer](assets/figure2_multi_seed_stability.png)
+*All 200 seeds converge within 5,000 steps with zero failures at init_norm=2.0.*
+
+### Seed stability (8-layer, edge_ln init)
+
+![Multi-seed accuracy on 8-layer architecture, n=100 per optimizer](assets/figure3_multi_seed_stability.png)
+*Zero failures across all 300 runs. Near-simultaneous train/val convergence.*
+
+### Lion learning rate tolerance
+
+![LR tolerance: Lion+Clip vs Lion no-clip, 40 seeds/LR](assets/figure5_lion_lr_stability.png)
+*Clipping provides 3–6× speedup at every LR with compressed variance. Usable band spans a full decade.*
+
+### 25/75 data-scarce regime (Lion only)
+
+![Multi-seed accuracy with 25/75 train/val split, n=200](assets/figure4_multi_seed_stability.png)
+*Lion+Clip is the only configuration that converges reliably under the harder 25/75 split.*
+
+---
+
+## Installation
+
+```bash
+pip install lion-pytorch
+```
+
+`SignSGD` is included in the repo (`SignSDG.py`). No other non-standard dependencies.
+
+---
+
+## Quickstart
+
+**Recommended (Lion+Clip, 2-layer):**
+```bash
+python train.py --optimizer Lion --lr 1e-3 --init_norm 2.0 --max_norm 2.0 --init_pattern all
+```
+
+**8-layer:**
+```bash
+python train.py --optimizer Lion --lr 1e-4 --num_layers 8 --init_norm 2.0 --max_norm 2.0 --init_pattern edge_ln
+```
+
+**Baseline (no clipping, AdamW):**
+```bash
+python baseline.py
+```
+
+---
+
+## Method
+
+After each optimizer step, clip every weight row in the decoder layers to the ℓ₂ ball of radius `max_norm`:
+
+```
+w_row ← w_row · min(1, max_norm / ‖w_row‖₂)
+```
+
+Applied to all decoder layer weights (attention projections, MLP, LayerNorm). Embeddings and output head are skipped — cross-entropy requires unconstrained logit magnitudes. No weight decay.
+
+### Training loop (actual)
+
+Clipping happens **inside the batch loop**, after each optimizer step:
+
+```python
+for input in dataloader:
+    loss.backward()
+    optimizer.step()
+    scheduler.step()
+
+    with torch.no_grad():
+        clip_weight_norms(model, max_norm=2.0)
+```
+
+### Core functions (`norms.py`)
+
+```python
+def project_to_sphere(model, max_norm=2.0, norm_patterns=['token_embeddings', 'ln_f', 'head']):
+    """One-time init. All matched rows get exactly max_norm — normalized, not clipped.
+    Pass norm_patterns=['*'] to normalize all parameters."""
+    for name, param in model.named_parameters():
+        if '*' in norm_patterns or any(p in name for p in norm_patterns):
+            norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+            param.mul_(max_norm / norm)
+
+def clip_weight_norms(model, max_norm=2.0, skip_patterns=['token_embeddings', 'head']):
+    """Post-step. Clips rows exceeding max_norm; rows below threshold unchanged."""
+    for name, param in model.named_parameters():
+        if any(p in name for p in skip_patterns):
+            continue
+        norm = param.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+        param.mul_(torch.clamp(norm, max=max_norm) / norm)
+```
+
+---
+
+## Hyperparameters
+
+Only two decisions, neither requires per-run tuning:
+
+| Parameter | Value | Notes |
+|---|---|---|
+| `max_norm` | `2.0` | Fixed across all optimizers, architectures, and LRs tested |
+| `init_pattern` | `all` (shallow) / `edge_ln` (deep) | Determined by depth alone |
+
+**No weight decay.** Default is `--weight_decay 0`.
+
+### Validated learning rates
+
+| Optimizer | 2-layer | 8-layer |
+|---|---|---|
+| Lion (β₁=0.9, β₂=0.97) | 1e-3 | 1e-4 |
+| Adam | 1e-3 | 2e-4 |
+| SignSGD | 1e-3 | 2e-4 |
+
+---
+
+## Initialization patterns
+
+Three options for `--init_pattern`:
+
+| Pattern | Layers normalized | Use case |
+|---|---|---|
+| `all` | All parameters (`['*']`) | Shallow models (L ≤ 3) |
+| `edge_ln` | `token_embeddings`, `ln_f`, `head` | Deep models (L ≥ 4) — **recommended** |
+| `edge` | `token_embeddings`, `head` | Excludes final LayerNorm |
+
+### Why not `all` for deep models?
+
+Initializing all layers to `c=2.0` amplifies output scale by `(c/‖w_init‖)^L`. For Kaiming init (`‖w‖ ≈ 0.6`): ~11× at L=2, ~13,000× at L=8. `edge_ln` leaves internal decoder layers at Kaiming scale to avoid this.
+
+### Why `init_norm` must match `max_norm` for Lion
+
+Sign-based optimizers require matched initialization. At `init_norm=1.0` with `max_norm=2.0`, Lion's IQR *worsens* (865 → 1010) because weights must grow toward the clipping boundary before clipping engages. At `init_norm=2.0`, clipping is active from step 1.
+
+---
+
+## Layer coverage
+
+| Layer type | Shallow (`all`) Init | Shallow Clip | Deep (`edge_ln`) Init | Deep Clip |
+|---|---|---|---|---|
+| Token embeddings | ✓ (to c) | — | ✓ (to c) | — |
+| Decoder layers | ✓ (to c) | ✓ (≤ c) | — (Kaiming) | ✓ (≤ c) |
+| Final LayerNorm | ✓ (to c) | ✓ (≤ c) | ✓ (to c) | — |
+| Output head | ✓ (to c) | — | ✓ (to c) | — |
+
+---
+
+## Weight norm dynamics
+
+![Weight norm evolution for Lion (2-layer)](assets/weight_norms_lion_2_2.png)
+*Clipped: decoder norms dip during the memorization-to-generalization transition, then recover to the boundary. Head norm grows freely.*
+
+![Baseline weight norm dynamics: decoder norms explode to 80× initial values](assets/weight_norms_adamw_0_0_baseline.png)
+*Without clipping, decoder norms reach 80× initial values. Softmax Collapse causes persistent val instability.*
+
+---
+
+## Softmax Collapse (baseline)
+
+![Softmax Collapse: validation loss spikes 10–30× above initial values](assets/adamw_heatmap_loss.png)
+![Accuracy spread across two orders of magnitude in convergence time](assets/adamw_heatmap_accuracy.png)
+*8-layer AdamW baseline (n=100). Float32 absorption errors in softmax produce erratic gradients. Clipping eliminates this entirely.*
+
+---
+
+## Optional: Head clipping for Lion
+
+After reaching 95%+ val accuracy, Lion can exhibit minor oscillations from unbounded head norm growth:
+
+```python
+# Lion only — do not use with Adam
+with torch.no_grad():
+    clip_weight_norms(model, max_norm=10.0, skip_patterns=['token_embeddings'])
+```
+
+**Do not apply with Adam** — Adam's second-moment statistics conflict with external head norm constraints and make oscillations worse.
+
+---
+
+## CLI reference
+
+```
+train.py arguments:
+
+  --p               Modular prime (default: 97)
+  --budget          Total optimization steps (default: 300000)
+  --batch_size      (default: 512)
+  --weight_decay    (default: 0)
+  --train_ratio     Train/val split fraction (default: 0.5)
+
+  --dim             Model width (default: 128)
+  --num_layers      (default: 2)
+  --num_heads       (default: 4)
+
+  --optimizer       Adam | AdamW | Lion | SignSGD (default: Lion)
+  --lr              (default: 1e-3)
+  --beta1           (default: 0.9)
+  --beta2           (default: 0.97)
+
+  --seed            (default: 0)
+  --random_seed     Use random seed (flag)
+
+  --init_pattern    all | edge | edge_ln (default: all)
+  --init_norm       Normalize to this norm at init; 0 = disable (default: 2.0)
+  --max_norm        Clip to this norm each step; 0 = disable (default: 2.0)
+```
+
+---
+
+## Why it works
+
+Four independent frameworks predict the same outcome:
+
+1. **Omnigrok timescale collapse** — Grokking delay scales as `(1/γ) · ln(w₀/wc)`. Clipping enforces `‖w‖ ≤ c ≈ wc` at every step, collapsing the log term to zero regardless of weight decay rate γ.
+
+2. **α^L depth scaling** — Full init at norm `c` amplifies 8-layer output ~13,000×. `edge_ln` avoids this; residual connections handle the rest.
+
+3. **Sign-based optimizer stability** — Lion's `sign(mₜ)` update moves each parameter by exactly ±lr per step. Without norm control, norms drift linearly. Clipping caps this, broadening the usable LR band by ~10×.
+
+4. **Softmax Collapse prevention** — Bounding decoder norms directly prevents float32 overflow in softmax that stalls post-memorization generalization.
+
+---
+
+## Citation
+
+```bibtex
+@article{volchkov2026cliptogrok,
+  title={Clip to Grok: Weight Norm Clipping for Accelerated Generalization},
+  author={Volchkov, Vladimir and Rivlin, Aviad},
+  year={2026}
+}
+```
