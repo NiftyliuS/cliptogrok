@@ -174,7 +174,7 @@ Sign-based optimizers require matched initialization. At `init_norm=1.0` with `m
 |---|---|---|---|---|
 | Token embeddings | ✓ (to c) | — | ✓ (to c) | — |
 | Decoder layers | ✓ (to c) | ✓ (≤ c) | — (Kaiming) | ✓ (≤ c) |
-| Final LayerNorm | ✓ (to c) | ✓ (≤ c) | ✓ (to c) | — |
+| Final LayerNorm | ✓ (to c) | ✓ (≤ c) | ✓ (to c) | ✓ (≤ c) |
 | Output head | ✓ (to c) | — | ✓ (to c) | — |
 
 ---
