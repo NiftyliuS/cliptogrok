@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", type=float, default=0.98)
 
     # Seed options
-    parser.add_argument("--random_seed", type=bool, default=False)
+    parser.add_argument("--random_seed", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
 
     # Clip controls

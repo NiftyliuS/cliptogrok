@@ -2,8 +2,6 @@
 
 Per-row weight norm clipping for accelerated generalization. Eliminates grokking delay without weight decay, gradient filtering, or optimizer-specific tuning.
 
-**Paper:** [Clip to Grok: Weight Norm Clipping for Accelerated Generalization](https://arxiv.org/abs/XXXX.XXXXX) (February 2026)
-
 ---
 
 ![Single-seed demonstration: train and val converge together within ~1000 steps](assets/BASELINE_LION_2L_128D_1E3_2_2_97_M_SEED_0_55.png)
@@ -70,7 +68,7 @@ tqdm==4.67.1
 matplotlib==3.10.8
 ```
 
-`SignSGD` is included in the repo (`SignSDG.py`). No other non-standard dependencies.
+`SignSGD` is included in the repo (`SignSGD.py`). No other non-standard dependencies.
 
 ---
 

@@ -8,7 +8,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from norms import project_to_sphere, clip_weight_norms
-from SignSDG import SignSGD
+from SignSGD import SignSGD
 
 
 class Block(nn.Module):
@@ -143,7 +143,7 @@ def main(args):
 
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
-    ### SignSDG optimizer inclusion ###
+    ### SignSGD optimizer inclusion ###
     if args.optimizer == 'SignSGD':
         # We don't use betas so we 'nan' them to not be confusing
         args.beta2 = args.beta1 = float('nan')
