@@ -13,11 +13,14 @@ Per-row weight norm clipping for accelerated generalization. Eliminates grokking
 
 ## Results
 
+Speedups computed against the AdamW baseline (no clipping, wd=0.01): 2-layer median 35,040 steps; 8-layer median 28,905 steps.
+
 | Architecture | Optimizer | Median Steps | Speedup vs. Baseline |
 |---|---|---|---|
 | 2-layer, 422k params | Lion+Clip | 550 | **66×** |
 | 2-layer, 422k params | Adam+Clip | 1,200 | ~29× |
 | 2-layer, 422k params | SignSGD+Clip | 1,140 | ~31× |
+| 2-layer, 422k params | AdamW baseline | 35,040 | — |
 | 8-layer, 1.6M params | Lion+Clip | 1,570 | **18×** |
 | 8-layer, 1.6M params | Adam+Clip | 2,690 | ~11× |
 | 8-layer, 1.6M params | SignSGD+Clip | 2,910 | ~10× |
@@ -55,7 +58,16 @@ Zero failures across all 300 edge-init runs on 8-layer models. IQR reduced by 61
 ## Installation
 
 ```bash
-pip install lion-pytorch
+pip install -r requirements.txt
+```
+
+```
+# requirements.txt
+torch==2.9.1+cu126
+torchvision==0.24.1+cu126
+lion-pytorch==0.2.3
+tqdm==4.67.1
+matplotlib==3.10.8
 ```
 
 `SignSGD` is included in the repo (`SignSDG.py`). No other non-standard dependencies.
@@ -160,11 +172,11 @@ Three options for `--init_pattern`:
 
 ### Why not `all` for deep models?
 
-Initializing all layers to `c=2.0` amplifies output scale by `(c/‖w_init‖)^L`. For Kaiming init (`‖w‖ ≈ 0.6`): ~11× at L=2, ~13,000× at L=8. `edge_ln` leaves internal decoder layers at Kaiming scale to avoid this.
+For a purely homogeneous L-layer network, scaling all weights to `init_norm=c` inflates each layer by `α = c/‖w_init‖`. For `c=2.0` and Kaiming init (`‖w‖ ≈ 0.6`): at L=2, α^L ≈ 11; at L=8, α^L ≈ 13,000. Our transformer uses residual connections and LayerNorm so this doesn't apply directly, but it motivates why initializing all layers to `c` improves 2-layer but harms 8-layer models. `edge_ln` leaves internal decoder layers at Kaiming scale — only the boundary layers (embeddings, `ln_f`, head) are touched.
 
 ### Why `init_norm` must match `max_norm` for Lion
 
-Sign-based optimizers require matched initialization. At `init_norm=1.0` with `max_norm=2.0`, Lion's IQR *worsens* (865 → 1010) because weights must grow toward the clipping boundary before clipping engages. At `init_norm=2.0`, clipping is active from step 1.
+Adaptive optimizers (Adam) tolerate imprecise initialization: per-parameter second moments compensate for scale mismatch, so any normalization eliminates failures. Sign-based optimizers require matched initialization. At `init_norm=1.0` with `max_norm=2.0`, Lion's IQR *worsens* (865 → 1010) — weights must grow from 1.0 toward the clipping boundary before clipping engages, creating a transient regime. At `init_norm=2.0`, all layers begin at the boundary and clipping engages immediately.
 
 ---
 
@@ -176,6 +188,8 @@ Sign-based optimizers require matched initialization. At `init_norm=1.0` with `m
 | Decoder layers | ✓ (to c) | ✓ (≤ c) | — (Kaiming) | ✓ (≤ c) |
 | Final LayerNorm | ✓ (to c) | ✓ (≤ c) | ✓ (to c) | ✓ (≤ c) |
 | Output head | ✓ (to c) | — | ✓ (to c) | — |
+
+Decoder layers are clipped every step to prevent memorization shortcuts. Embeddings and head are not clipped — cross-entropy requires unconstrained logit magnitudes — but are initialized to `c` so the network begins at consistent scale. The final LayerNorm (`ln_f`) sits between the last decoder layer and the output head; initializing it to `c` ensures stable gradient flow at this boundary. In shallow models, initializing all layers to `c` eliminates seed variance entirely. In deep models, this inflates residual contributions exponentially (α^L), so only the boundary layers are touched — hence "edge" initialization.
 
 ---
 
@@ -243,24 +257,20 @@ train.py arguments:
 
 ## Why it works
 
-Four independent frameworks predict the same outcome:
+Four established frameworks each independently predict that bounding weight norms accelerates generalization. Clipping implements this directly.
 
-1. **Omnigrok timescale collapse** — Grokking delay scales as `(1/γ) · ln(w₀/wc)`. Clipping enforces `‖w‖ ≤ c ≈ wc` at every step, collapsing the log term to zero regardless of weight decay rate γ.
+**1. Omnigrok timescale collapse**
 
-2. **α^L depth scaling** — Full init at norm `c` amplifies 8-layer output ~13,000×. `edge_ln` avoids this; residual connections handle the rest.
+The grokking timescale depends on how far initialization `w₀` lies from the Goldilocks zone radius `wc`: `t_grok ≈ (1/γ) · ln(w₀/wc)`, where γ is the weight decay rate. Clipping eliminates this delay by constraining `‖w‖ ≤ c` at every step. If `c ≈ wc`, then `ln(w₀/wc) → 0` and the timescale collapses regardless of γ — making weight decay unnecessary and making the method robust to the exact value of `c`.
 
-3. **Sign-based optimizer stability** — Lion's `sign(mₜ)` update moves each parameter by exactly ±lr per step. Without norm control, norms drift linearly. Clipping caps this, broadening the usable LR band by ~10×.
+**2. α^L depth scaling**
 
-4. **Softmax Collapse prevention** — Bounding decoder norms directly prevents float32 overflow in softmax that stalls post-memorization generalization.
+For an L-layer homogeneous network, scaling weights by α amplifies output by α^L. For `c=2.0` and Kaiming init (`‖w‖ ≈ 0.6`): at L=2, α^L ≈ 11; at L=8, α^L ≈ 13,000. Our transformer uses residual connections and LayerNorm so the homogeneous analysis doesn't directly apply, but it explains why `init_norm=2.0` on all layers improves 2-layer but harms 8-layer models. In residual networks, skip connections convert the exponential α^L risk into bounded linear perturbation L·c, which is why the same `max_norm=2.0` works across depths with edge initialization.
 
----
+**3. Sign-based optimizers and norm clipping**
 
-## Citation
+Lion's update is `sign(mₜ)`: each parameter changes by exactly ±lr per step regardless of gradient magnitude. Without norm control, this uniform step size means weight norms grow linearly in training steps. Clipping caps this growth, preventing drift toward Softmax Collapse. The combination — bounded updates from the sign operation, bounded norms from clipping — keeps optimization stable across a wide LR range: 3–6× speedup at every tested LR, 0% failures up to LR=2×10⁻³ vs 100% failure without clipping at the same LR.
 
-```bibtex
-@article{volchkov2026cliptogrok,
-  title={Clip to Grok: Weight Norm Clipping for Accelerated Generalization},
-  author={Volchkov, Vladimir and Rivlin, Aviad},
-  year={2026}
-}
-```
+**4. Softmax Collapse prevention**
+
+After memorization, the training objective (negative log-likelihood) can still decrease by increasing logit magnitudes, which requires growing weight norms. This post-memorization weight growth drives logit amplification until float32 overflow causes absorption errors in softmax, producing erratic gradients that stall generalization. Clipping eliminates this cascade by bounding decoder norms: `‖w_row‖₂ ≤ c` directly caps logit growth, preventing overflow regardless of training duration.
