@@ -5,7 +5,8 @@ from train import main
 # Default setup - no norm no clip ~35k steps to 95% val
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--p", type=int, default=97)
+    parser.add_argument("--task", type=str, default="sub-p97",
+                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
     parser.add_argument("--budget", type=int, default=3e5)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0.01)
