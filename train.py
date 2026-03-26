@@ -6,10 +6,16 @@ from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
-from datasets import multiplication_mod_p_data, permutation_s5_data, sparse_parity_data, addition_mod_p_data, \
-    subtraction_mod_p_data, division_mod_p_data, multiplication_mod_p_data_shuffled
-from norms import project_to_sphere, clip_weight_norms
 from SignSGD import SignSGD
+from norms import project_to_sphere, clip_weight_norms
+from datasets import (
+    addition_mod_p_data,
+    subtraction_mod_p_data,
+    multiplication_mod_p_data,
+    division_mod_p_data,
+    permutation_s5_data,
+    sparse_parity_data,
+)
 
 
 class Block(nn.Module):
