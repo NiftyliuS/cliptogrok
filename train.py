@@ -14,7 +14,6 @@ from datasets import (
     multiplication_mod_p_data,
     division_mod_p_data,
     permutation_s5_data,
-    sparse_parity_data,
 )
 
 
@@ -114,12 +113,6 @@ def main(args):
         data = permutation_s5_data(eq_token=120, op_token=121)
 
         num_tokens, seq_len = 122, 5
-    elif args.task == 'parity':
-        n, k = 10, 3
-
-        data = sparse_parity_data(n, k, eq_token=2)
-
-        num_tokens, seq_len = 3, n + 2
     elif args.task == 'all-mod':
         p = 97
         eq_token = 97
@@ -295,7 +288,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="mul-p97",
-                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
+                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
     parser.add_argument("--budget", type=int, default=2e3)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0)
