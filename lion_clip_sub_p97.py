@@ -5,11 +5,11 @@ from train import main
 # Default setup - no norm no clip ~35k steps to 95% val
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--task", type=str, default="add-p97",
+    parser.add_argument("--task", type=str, default="sub-p97",
                         choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
-    parser.add_argument("--budget", type=int, default=1e5)  # 100_000 steps
+    parser.add_argument("--budget", type=int, default=2e3)  # 2_000 steps
     parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--weight_decay", type=float, default=0.01)
+    parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
 
     # Model configuration
@@ -18,10 +18,10 @@ if __name__ == "__main__":
     parser.add_argument("--num_heads", type=int, default=4)
 
     # Optimizer controls
-    parser.add_argument("--optimizer", default="AdamW")
+    parser.add_argument("--optimizer", default="Lion")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
-    parser.add_argument("--beta2", type=float, default=0.98)
+    parser.add_argument("--beta2", type=float, default=0.97)
 
     # Seed options
     parser.add_argument("--random_seed", action="store_true")
@@ -29,8 +29,8 @@ if __name__ == "__main__":
 
     # Clip controls
     parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge", "edge_ln"])
-    parser.add_argument("--init_norm", type=float, default=0.0)  # 0 = disable
-    parser.add_argument("--max_norm", type=float, default=0.0)  # 0 = disable
+    parser.add_argument("--init_norm", type=float, default=1.5)  # 0 = disable
+    parser.add_argument("--max_norm", type=float, default=1.5)  # 0 = disable
 
     parser.add_argument("--plot_progress", action="store_true")
     args = parser.parse_args()

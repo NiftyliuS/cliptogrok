@@ -6,7 +6,7 @@ from train import main
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="div-p97",
-                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
+                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
     parser.add_argument("--budget", type=int, default=1e5)  # 100_000 steps
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0.01)

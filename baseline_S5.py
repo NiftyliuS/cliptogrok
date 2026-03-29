@@ -6,7 +6,7 @@ from train import main
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="S5",
-                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
+                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
     parser.add_argument("--budget", type=int, default=5e5)  # 500_000 steps
     parser.add_argument("--batch_size", type=int, default=960)  # The LR is not batch balanced so we need to adjust
     parser.add_argument("--weight_decay", type=float, default=0.01)
