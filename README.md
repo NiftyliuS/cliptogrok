@@ -74,19 +74,28 @@ matplotlib==3.10.8
 
 ## Quickstart
 
-**Recommended (Lion+Clip, 2-layer):**
+**Lion+Clip (mul-p97, 2-layer):**
 ```bash
-python train.py --optimizer Lion --lr 1e-3 --init_norm 2.0 --max_norm 2.0 --init_pattern all
+python train.py --task mul-p97 --optimizer Lion --lr 1e-3 --init_norm 2.0 --max_norm 2.0 --init_pattern all
+```
+
+**Other tasks (norm varies by task difficulty):**
+```bash
+python train.py --task add-p97 --optimizer Lion --lr 1e-3 --init_norm 1.75 --max_norm 1.75
+python train.py --task sub-p97 --optimizer Lion --lr 1e-3 --init_norm 1.5 --max_norm 1.5
+python train.py --task div-p97 --optimizer Lion --lr 1e-3 --init_norm 1.75 --max_norm 1.75
+python train.py --task all-mod --optimizer Lion --lr 1e-3 --init_norm 1.75 --max_norm 1.75 --batch_size 2048
+python train.py --task S5 --optimizer Lion --lr 1e-3 --init_norm 1.0 --max_norm 1.0 --batch_size 2048
 ```
 
 **8-layer:**
 ```bash
-python train.py --optimizer Lion --lr 1e-4 --num_layers 8 --init_norm 2.0 --max_norm 2.0 --init_pattern edge_ln
+python train.py --task mul-p97 --optimizer Lion --lr 1e-4 --num_layers 8 --init_norm 2.0 --max_norm 2.0 --init_pattern edge_ln
 ```
 
 **Baseline (no clipping, AdamW):**
 ```bash
-python baseline.py
+python train.py --task mul-p97 --optimizer AdamW --lr 1e-3 --weight_decay 0.01 --init_norm 0 --max_norm 0
 ```
 
 ---
@@ -139,14 +148,28 @@ def clip_weight_norms(model, max_norm=2.0, skip_patterns=['token_embeddings', 'h
 
 ## Hyperparameters
 
-Only two decisions, neither requires per-run tuning:
+Two decisions: `max_norm` (task-dependent) and `init_pattern` (depth-dependent).
+
+### Task-specific norms
+
+Optimal norm scales inversely with task difficulty. Symmetric operations (add, mul) are easier than asymmetric (sub, div). S5 permutation is hardest.
+
+| Task | max_norm | Median Steps (n=100) | Notes |
+|---|---|---|---|
+| mul-p97 | 2.0 | 535 | Symmetric, easiest |
+| add-p97 | 1.75 | 570 | Symmetric |
+| div-p97 | 1.75 | 730 | Asymmetric |
+| sub-p97 | 1.5 | 775 | Asymmetric |
+| all-mod | 1.75 | 3090 | Combined (averages out) |
+| S5 perm | 1.0 | 1348 | Non-abelian, hardest |
+
+`init_norm` should match `max_norm` for Lion. See "Why `init_norm` must match `max_norm` for Lion" below.
+
+**No weight decay.** Default is `--weight_decay 0`.
 
 | Parameter | Value | Notes |
 |---|---|---|
-| `max_norm` | `2.0` | Fixed across all optimizers, architectures, and LRs tested |
 | `init_pattern` | `all` (shallow) / `edge_ln` (deep) | Determined by depth alone |
-
-**No weight decay.** Default is `--weight_decay 0`.
 
 ### Validated learning rates
 
@@ -228,8 +251,8 @@ with torch.no_grad():
 ```
 train.py arguments:
 
-  --p               Modular prime (default: 97)
-  --budget          Total optimization steps (default: 300000)
+  --task            Task: add-p97 | sub-p97 | mul-p97 | div-p97 | all-mod | S5 (default: mul-p97)
+  --budget          Total optimization steps (default: 2000)
   --batch_size      (default: 512)
   --weight_decay    (default: 0)
   --train_ratio     Train/val split fraction (default: 0.5)
@@ -249,6 +272,8 @@ train.py arguments:
   --init_pattern    all | edge | edge_ln (default: all)
   --init_norm       Normalize to this norm at init; 0 = disable (default: 2.0)
   --max_norm        Clip to this norm each step; 0 = disable (default: 2.0)
+
+  --plot_progress   Show plots every 100 epochs (flag)
 ```
 
 ---
