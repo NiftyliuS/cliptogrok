@@ -7,7 +7,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="add-p97",
                         choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
-    parser.add_argument("--budget", type=int, default=3e5)
+    parser.add_argument("--budget", type=int, default=1e5)  # 100_000 steps
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--train_ratio", type=float, default=0.5)
@@ -32,5 +32,6 @@ if __name__ == "__main__":
     parser.add_argument("--init_norm", type=float, default=0.0)  # 0 = disable
     parser.add_argument("--max_norm", type=float, default=0.0)  # 0 = disable
 
+    parser.add_argument("--plot_progress", action="store_true")
     args = parser.parse_args()
     main(args)
