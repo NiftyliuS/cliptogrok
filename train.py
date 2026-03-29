@@ -6,9 +6,15 @@ from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
-
-from norms import project_to_sphere, clip_weight_norms
 from SignSGD import SignSGD
+from norms import project_to_sphere, clip_weight_norms
+from datasets import (
+    addition_mod_p_data,
+    subtraction_mod_p_data,
+    multiplication_mod_p_data,
+    division_mod_p_data,
+    permutation_s5_data,
+)
 
 
 class Block(nn.Module):
@@ -69,24 +75,6 @@ class Decoder(nn.Module):
         return logits
 
 
-def multiplication_mod_p_data(p, eq_token, op_token):
-    """
-    x◦y = x*y (mod p) for 0 ≤ x < p, 0 < y < p
-    """
-    x = torch.arange(p)
-    y = torch.arange(1, p)
-    x, y = torch.cartesian_prod(x, y).T
-
-    eq = torch.ones_like(x) * eq_token
-    op = torch.ones_like(x) * op_token
-    result = x * y % p
-
-    # "All of our experiments used a small transformer trained on datasets of
-    # equations of the form a◦b = c, where each of “a”, “◦”, “b”, “=”, and “c”
-    # is a seperate token"
-    return torch.stack([x, op, y, eq, result])
-
-
 def main(args):
     if args.random_seed:
         args.seed = torch.seed()
@@ -95,18 +83,53 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # tokens for <op> and <=>. It's not clear why <=> is needed at all since it
-    # has no effect on the output, but we'll leave it in to best follow the
-    # paper.
-    eq_token = args.p
-    op_token = args.p + 1
+    # Task-specific data generation and model config
+    if args.task == 'add-p97':
+        p = 97
 
-    # "We trained a standard decoder-only transformer (Vaswani et al., 2017)
-    # with causal attention masking, and calculated loss and accuracy only on
-    # the answer part of the equation. For all experiments we used a
-    # transformer with 2 layers, width 128, and 4 attention heads"
+        data = addition_mod_p_data(p, eq_token=p, op_token=p + 1)
+
+        num_tokens, seq_len = p + 2, 5
+    elif args.task == 'sub-p97':
+        p = 97
+
+        data = subtraction_mod_p_data(p, eq_token=p, op_token=p + 1)
+
+        num_tokens, seq_len = p + 2, 5
+    elif args.task == 'mul-p97':
+        p = 97
+
+        data = multiplication_mod_p_data(p, eq_token=p, op_token=p + 1)
+
+        num_tokens, seq_len = p + 2, 5
+    elif args.task == 'div-p97':
+        p = 97
+
+        data = division_mod_p_data(p, eq_token=p, op_token=p + 1)
+
+        num_tokens, seq_len = p + 2, 5
+    elif args.task == 'S5':
+
+        data = permutation_s5_data(eq_token=120, op_token=121)
+
+        num_tokens, seq_len = 122, 5
+    elif args.task == 'all-mod':
+        p = 97
+        eq_token = 97
+
+        add_data = addition_mod_p_data(p, eq_token=eq_token, op_token=98)
+        sub_data = subtraction_mod_p_data(p, eq_token=eq_token, op_token=99)
+        mul_data = multiplication_mod_p_data(p, eq_token=eq_token, op_token=100)
+        div_data = division_mod_p_data(p, eq_token=eq_token, op_token=101)
+
+        data = torch.cat([add_data, sub_data, mul_data, div_data], dim=1)
+        num_tokens, seq_len = 102, 5
+
+    else:
+        raise ValueError(f"Unknown task: {args.task}")
+
     model = Decoder(
-        dim=args.dim, num_layers=args.num_layers, num_heads=args.num_heads, num_tokens=args.p + 2, seq_len=5
+        dim=args.dim, num_layers=args.num_layers, num_heads=args.num_heads, num_tokens=num_tokens, seq_len=seq_len
     ).to(device)
 
     #### Counting model parameters ####
@@ -127,12 +150,6 @@ def main(args):
     if args.max_norm > 0:
         with torch.no_grad():
             clip_weight_norms(model, args.max_norm)
-    #######################################
-
-    # "We train on the binary operation of multiplication mod 'args.p' with 'args.train_ratio' of the data
-    # in the training set."
-    data = multiplication_mod_p_data(args.p, eq_token, op_token)
-
     # train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2) # original code
 
     ##### Configurable train to validation data ratio #####
@@ -235,12 +252,15 @@ def main(args):
                 f"init_pattern: {args.init_pattern if args.init_norm else 'None'}",
                 f"init_norm: {args.init_norm or 'None'}",
                 f"max_norm: {args.max_norm or 'None'}",
+                f"task: {args.task}",
             ]))
             fig.text(0.5, 0.89, ", ".join([
+                f"params: {model_num_params:,}",
                 f"β1: {args.beta1:.2f}",
                 f"β2: {args.beta2:.2f}",
-                f"params: {model_num_params:,}",
+                f"wd: {args.weight_decay:.2f}",
                 f"seed: {torch.initial_seed()}",
+                f"batch: {args.batch_size}",
             ]), ha='center', fontsize=10)
 
             ax1.plot(steps, train_loss, label="train")
@@ -261,13 +281,14 @@ def main(args):
 
             plt.tight_layout()
             plt.show()
-            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}.png")
+            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}-task_{args.task}.png")
             plt.close()
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--p", type=int, default=97)
+    parser.add_argument("--task", type=str, default="mul-p97",
+                        choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
     parser.add_argument("--budget", type=int, default=2e3)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0)
