@@ -202,7 +202,7 @@ def main(args):
     )
 
     steps_per_epoch = math.ceil(train_data.shape[1] / args.batch_size)
-
+    total_epochs = int(args.budget) // steps_per_epoch
     train_acc, val_acc, train_loss, val_loss = [], [], [], []
 
     for e in tqdm(range(int(args.budget) // steps_per_epoch)):
@@ -250,7 +250,7 @@ def main(args):
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
 
-        if (e + 1) % 100 == 0:
+        if (args.plot_progress and (e + 1) % 100 == 0) or ((e + 1) >= total_epochs):
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
             fig.suptitle(", ".join([
@@ -288,6 +288,7 @@ def main(args):
 
             plt.tight_layout()
             plt.show()
+            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}.png")
             plt.close()
 
 
@@ -295,7 +296,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="mul-p97",
                         choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5", "parity"])
-    parser.add_argument("--budget", type=int, default=3e5)
+    parser.add_argument("--budget", type=int, default=1e2)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
@@ -307,7 +308,7 @@ if __name__ == "__main__":
 
     # Optimizer controls
     parser.add_argument("--optimizer", default="Lion")
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=1.1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.97)
 
@@ -319,6 +320,8 @@ if __name__ == "__main__":
     parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge", "edge_ln"])
     parser.add_argument("--init_norm", type=float, default=2.0)  # 0 = disable
     parser.add_argument("--max_norm", type=float, default=2.0)  # 0 = disable
+
+    parser.add_argument("--plot_progress", action="store_true")
 
     args = parser.parse_args()
     main(args)
