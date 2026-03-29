@@ -7,7 +7,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--task", type=str, default="all-mod",
                         choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
-    parser.add_argument("--budget", type=int, default=3e3)  # 3_000 steps
+    parser.add_argument("--budget", type=int, default=5e3)  # 5_000 steps
     parser.add_argument("--batch_size", type=int, default=2048)  # 4 times the data, 4 times the batch size
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
