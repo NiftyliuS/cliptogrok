@@ -59,16 +59,6 @@ def permutation_s5_data(eq_token, op_token):
     return torch.stack([x, torch.full_like(x, op_token), y, torch.full_like(x, eq_token), result])
 
 
-def sparse_parity_data(n, k, eq_token, seed=42):
-    """XOR of k random bits from n-bit input. Returns (n+2, 2^n) tensor."""
-    rng = torch.Generator().manual_seed(seed)
-    secret = torch.randperm(n, generator=rng)[:k].tolist()
-    indices = torch.arange(2 ** n)
-    bits = ((indices.unsqueeze(1) >> torch.arange(n - 1, -1, -1)) & 1)
-    parity = bits[:, secret].sum(dim=1) % 2
-    return torch.stack([*bits.T, torch.full((2 ** n,), eq_token), parity])
-
-
 def multiplication_mod_p_data_shuffled(p, eq_token, op_token, seed=42):
     """Same as mul, but token indices are randomly permuted."""
     torch.manual_seed(seed)
@@ -85,4 +75,3 @@ def multiplication_mod_p_data_shuffled(p, eq_token, op_token, seed=42):
     result = shuffle[result]
 
     return torch.stack([x, torch.full_like(x, op_token), y, torch.full_like(x, eq_token), result])
-
