@@ -288,7 +288,7 @@ def main(args):
 
             plt.tight_layout()
             plt.show()
-            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}.png")
+            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}-task_{args.task}.png")
             plt.close()
 
 
