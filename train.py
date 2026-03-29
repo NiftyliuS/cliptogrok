@@ -268,7 +268,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--p", type=int, default=97)
-    parser.add_argument("--budget", type=int, default=1e2)
+    parser.add_argument("--budget", type=int, default=2e3)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
     # Optimizer controls
     parser.add_argument("--optimizer", default="Lion")
-    parser.add_argument("--lr", type=float, default=1.1e-3)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.97)
 
