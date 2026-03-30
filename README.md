@@ -2,6 +2,8 @@
 
 Per-row weight norm clipping for accelerated generalization. Eliminates grokking delay without weight decay, gradient filtering, or optimizer-specific tuning.
 
+**Paper:** [Clip to Grok: Weight Norm Clipping for Accelerated Generalization](https://arxiv.org/abs/XXXX.XXXXX)
+
 ---
 
 ![Single-seed demonstration: train and val converge together within ~1000 steps](assets/BASELINE_LION_2L_128D_1E3_2_2_97_M_SEED_0_55.png)
@@ -12,6 +14,8 @@ Per-row weight norm clipping for accelerated generalization. Eliminates grokking
 ## Results
 
 Speedups computed against the AdamW baseline (no clipping, wd=0.01): 2-layer median 35,040 steps; 8-layer median 28,905 steps.
+
+### Seed stability (2-layer, mul-p97)
 
 | Architecture | Optimizer | Median Steps | Speedup vs. Baseline |
 |---|---|---|---|
@@ -25,6 +29,23 @@ Speedups computed against the AdamW baseline (no clipping, wd=0.01): 2-layer med
 | 8-layer, 1.6M params | AdamW baseline | 28,905 | — |
 
 Zero failures across all 300 edge-init runs on 8-layer models. IQR reduced by 61–72%.
+
+### Cross-task speedups (Lion+Clip vs. AdamW baseline, single seed)
+
+| Task | max_norm | Lion+Clip Steps | AdamW Steps | Speedup |
+|---|---|---|---|---|
+| mul-p97 | 2.0 | 530 | 35,040 | **66×** |
+| add-p97 | 1.75 | 580 | 40,240 | **69×** |
+| sub-p97 | 1.5 | 660 | 57,670 | **87×** |
+| div-p97 | 1.75 | 1,830 | 71,160 | **39×** |
+| all-mod | 1.75 | 1,740 | 86,400 | **50×** |
+| S5 perm | 1.0 | 1,568 | 390,896 | **249×** |
+
+Speedups range from **39× to 249×** across six algebraic tasks. S5 permutation composition (non-abelian, 120 elements) is the hardest baseline task (390,896 steps); tighter clipping (max_norm=1.0) eliminates the grokking plateau entirely.
+
+---
+
+## Figures
 
 ### Baseline vs. Grokfast vs. Clip
 
@@ -40,6 +61,23 @@ Zero failures across all 300 edge-init runs on 8-layer models. IQR reduced by 61
 
 ![Multi-seed accuracy on 8-layer architecture, n=100 per optimizer](assets/figure3_multi_seed_stability.png)
 *Zero failures across all 300 runs. Near-simultaneous train/val convergence.*
+
+### Cross-task comparisons
+
+<table>
+<tr>
+<td><img src="assets/adamw_vs_lion_clip_2.0_vs_lion_noclip_mul-p97.png"/><br/><em>mul-p97 (max_norm=2.0): 66× speedup</em></td>
+<td><img src="assets/adamw_vs_lion_clip_1.75_vs_lion_noclip_add-p97.png"/><br/><em>add-p97 (max_norm=1.75): 69× speedup</em></td>
+</tr>
+<tr>
+<td><img src="assets/adamw_vs_lion_clip_1.5_vs_lion_noclip_sub-p97.png"/><br/><em>sub-p97 (max_norm=1.5): 87× speedup</em></td>
+<td><img src="assets/adamw_vs_lion_clip_1.75_vs_lion_noclip_div-p97.png"/><br/><em>div-p97 (max_norm=1.75): 39× speedup</em></td>
+</tr>
+<tr>
+<td><img src="assets/adamw_vs_lion_clip_1.75_all-mod.png"/><br/><em>all-mod (max_norm=1.75): 50× speedup</em></td>
+<td><img src="assets/adamw_vs_lion_clip_1.0_S5.png"/><br/><em>S5 permutation (max_norm=1.0): 249× speedup</em></td>
+</tr>
+</table>
 
 ### Lion learning rate tolerance
 
@@ -85,7 +123,7 @@ python train.py --task add-p97 --optimizer Lion --lr 1e-3 --init_norm 1.75 --max
 python train.py --task sub-p97 --optimizer Lion --lr 1e-3 --init_norm 1.5 --max_norm 1.5
 python train.py --task div-p97 --optimizer Lion --lr 1e-3 --init_norm 1.75 --max_norm 1.75
 python train.py --task all-mod --optimizer Lion --lr 1e-3 --init_norm 1.75 --max_norm 1.75 --batch_size 2048
-python train.py --task S5 --optimizer Lion --lr 1e-3 --init_norm 1.0 --max_norm 1.0 --batch_size 2048
+python train.py --task S5 --optimizer Lion --lr 1e-3 --init_norm 1.0 --max_norm 1.0 --batch_size 960
 ```
 
 **8-layer:**
@@ -152,14 +190,14 @@ Two decisions: `max_norm` (task-dependent) and `init_pattern` (depth-dependent).
 
 ### Task-specific norms
 
-Optimal norm scales inversely with task difficulty. Symmetric operations (add, mul) are easier than asymmetric (sub, div). S5 permutation is hardest.
+Optimal norm correlates with task algebraic structure. Symmetric operations (add, mul) tolerate looser norms; asymmetric inverse-dependent operations (sub, div) require tighter norms; non-abelian structures (S5) require the tightest.
 
 | Task | max_norm | Median Steps (n=100) | Notes |
 |---|---|---|---|
-| mul-p97 | 2.0 | 535 | Symmetric, easiest |
-| add-p97 | 1.75 | 570 | Symmetric |
-| div-p97 | 1.75 | 730 | Asymmetric |
-| sub-p97 | 1.5 | 775 | Asymmetric |
+| mul-p97 | 2.0 | 535 | Symmetric, direct |
+| add-p97 | 1.75 | 570 | Symmetric, direct |
+| div-p97 | 1.75 | 730 | Asymmetric, inverse-dependent |
+| sub-p97 | 1.5 | 775 | Asymmetric, inverse-dependent |
 | all-mod | 1.75 | 3090 | Combined (averages out) |
 | S5 perm | 1.0 | 1348 | Non-abelian, hardest |
 
