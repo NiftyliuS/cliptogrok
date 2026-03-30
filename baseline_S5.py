@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     # Optimizer controls
     parser.add_argument("--optimizer", default="AdamW")
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.98)
 
