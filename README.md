@@ -2,8 +2,6 @@
 
 Per-row weight norm clipping for accelerated generalization. Eliminates grokking delay without weight decay or gradient filtering.
 
-**Paper:** [Clip to Grok: Weight Norm Clipping for Accelerated Generalization](https://arxiv.org/abs/XXXX.XXXXX)
-
 ---
 
 ![Single-seed demonstration: train and val converge together within ~1000 steps](assets/BASELINE_LION_2L_128D_1E3_2_2_97_M_SEED_0_55.png)
