@@ -203,22 +203,27 @@ def main(args):
         # randomly shuffle train data
         train_data = train_data[:, torch.randperm(train_data.shape[1])]
 
-        for data, is_train in [(train_data, True), (valid_data, False)]:
+        for data, is_train in [(train_data.T, True), (valid_data.T, False)]:
 
             model.train(is_train)
             total_loss = 0
             total_acc = 0
 
             # torch.split faster than dataloader with tensor
-            dl = torch.split(data, args.batch_size, dim=1)
-            for input in dl:
-                input = input.to(device)
+            dl = torch.split(data, args.batch_size, dim=0)
+            for input_batch in dl:
+                input_batch = input_batch.to(device)
 
                 with torch.set_grad_enabled(is_train):
-                    logits = model(input[:-1])
-                    # calculate loss only on the answer part of the equation (last element
-                    loss = F.cross_entropy(logits[-1], input[-1])
-                    total_loss += loss.item() * input.shape[-1]
+                    # logits usually [batch_size, seq_len-1, vocab_size]
+                    inputs = input_batch
+                    labels = torch.full_like(inputs, -100)
+                    labels[:, -1] = inputs[:, -1]
+
+                    out = model(inputs, labels=labels)
+                    logits = out.logits
+                    loss = out.loss
+                    total_loss += loss.item() * input_batch.shape[0]
 
                 if is_train:
                     model.zero_grad()
@@ -233,15 +238,14 @@ def main(args):
                             clip_weight_norms(model, args.max_norm)
                     #######################################
 
-                acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
-                total_acc += acc.item() * input.shape[-1]
-
+                acc = (logits[:, -2, :].argmax(-1) == input_batch[:, -1]).float().mean()
+                total_acc += acc.item() * input_batch.shape[0]
             if is_train:
-                train_acc.append(total_acc / train_data.shape[-1])
-                train_loss.append(total_loss / train_data.shape[-1])
+                train_acc.append(total_acc / train_data.shape[1])
+                train_loss.append(total_loss / train_data.shape[1])
             else:
-                val_acc.append(total_acc / valid_data.shape[-1])
-                val_loss.append(total_loss / valid_data.shape[-1])
+                val_acc.append(total_acc / valid_data.shape[1])
+                val_loss.append(total_loss / valid_data.shape[1])
 
         if (args.plot_progress and (e + 1) % 100 == 0) or ((e + 1) >= total_epochs):
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
