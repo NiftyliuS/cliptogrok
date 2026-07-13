@@ -4,7 +4,10 @@ from lion_pytorch import Lion
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
+from transformers import LlamaModel, LlamaForCausalLM, LlamaConfig
+
 from SignSGD import SignSGD
+from goblin_for_causal_lm import GoblinConfig, GoblinForCausalLM
 from norms import project_to_sphere, clip_weight_norms
 from datasets import (
     addition_mod_p_data,
@@ -68,7 +71,36 @@ def main(args):
     else:
         raise ValueError(f"Unknown task: {args.task}")
 
-    model = placeholder
+    if args.model == "goblin":
+        config = GoblinConfig(
+            vocab_size=num_tokens,
+
+            hidden_size=args.dim,
+            intermediate_size=352,
+            num_hidden_layers=args.num_layers,
+
+            attn_heads=4,
+            conv_k=2,
+        )
+        model_name = "GoblinForCausalLM"
+        model = GoblinForCausalLM(config).to(device)
+    elif args.model == "llama":
+        config = LlamaConfig(
+            vocab_size=num_tokens,
+            max_position_embeddings=seq_len,
+
+            hidden_size=args.dim,
+            intermediate_size=352,
+            num_hidden_layers=args.num_layers,
+
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        model_name = "LlamaForCausalLM"
+        model = LlamaForCausalLM(config).to(device)
+    else:
+        print("Please select model=[goblin|llama]")
+        exit(1)
 
     #### Counting model parameters ####
     model_num_params = sum(p.numel() for p in model.parameters())
@@ -78,8 +110,7 @@ def main(args):
         with torch.no_grad():
             patterns = {
                 'all': ['*'],  # all layers
-                'edge': ['token_embeddings', 'head'],  # first + last
-                'edge_ln': ['token_embeddings', 'ln_f', 'head'],  # first + last + final LayerNorm
+                'edge': ['embed_tokens', 'lm_head'],  # first + last
             }[args.init_pattern]
             project_to_sphere(model, args.init_norm, patterns)
     ########################################
@@ -87,7 +118,7 @@ def main(args):
     ## CLip layers to max_norm magnitude ##
     if args.max_norm > 0:
         with torch.no_grad():
-            clip_weight_norms(model, args.max_norm)
+            clip_weight_norms(model, args.max_norm, skip_patterns=['embed_tokens', 'lm_head'])
     # train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2) # original code
 
     ##### Configurable train to validation data ratio #####
@@ -189,6 +220,7 @@ def main(args):
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
             fig.suptitle(", ".join([
+                f"model: {model_name}",
                 f"optim: {args.optimizer}",
                 f"lr: {args.lr:.0e}",
                 f"init_pattern: {args.init_pattern if args.init_norm else 'None'}",
@@ -223,17 +255,19 @@ def main(args):
 
             plt.tight_layout()
             plt.show()
-            fig.savefig(f"optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}-task_{args.task}.png")
+            fig.savefig(
+                f"{args.model}_optim_{args.optimizer}-lr_{args.lr:.1e}-clip_{args.max_norm:.2f}-task_{args.task}.png")
             plt.close()
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument("--model", type=str, default="goblin", choices=["goblin", "llama"])
+
     parser.add_argument("--task", type=str, default="mul-p97",
                         choices=["add-p97", "sub-p97", "mul-p97", "div-p97", "all-mod", "S5"])
     parser.add_argument("--budget", type=int, default=2e3)
     parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--train_ratio", type=float, default=0.5)
 
     # Model configuration
@@ -243,6 +277,7 @@ if __name__ == "__main__":
 
     # Optimizer controls
     parser.add_argument("--optimizer", default="Lion")
+    parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.97)
@@ -252,9 +287,9 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=0)
 
     # Clip controls
-    parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge", "edge_ln"])
-    parser.add_argument("--init_norm", type=float, default=2.0)  # 0 = disable
-    parser.add_argument("--max_norm", type=float, default=2.0)  # 0 = disable
+    parser.add_argument("--init_pattern", type=str, default="all", choices=["all", "edge"])
+    parser.add_argument("--init_norm", type=float, default=1.0)  # 0 = disable
+    parser.add_argument("--max_norm", type=float, default=1.0)  # 0 = disable
 
     parser.add_argument("--plot_progress", action="store_true")
 

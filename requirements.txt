@@ -3,3 +3,4 @@ torchvision==0.24.1+cu126  # version used in experiments; newer versions may pro
 lion-pytorch==0.2.3
 tqdm==4.67.1
 matplotlib==3.10.8
+transformers==5.13.1
