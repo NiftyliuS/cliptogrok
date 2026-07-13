@@ -19,6 +19,7 @@ from datasets import (
 
 
 def main(args):
+    print("Warning!You are testing LLamaForCausalLM / GoblinForCausalLM not the paper models!")
     if args.random_seed:
         args.seed = torch.seed()
     else:
